@@ -1,4 +1,4 @@
-# streamlit/app.py ← deze start gegarandeerd binnen 10 seconden
+# streamlit/app.py  ← plak dit 1-op-1 over je huidige bestand
 
 import streamlit as st
 import pandas as pd
@@ -7,30 +7,44 @@ import matplotlib.patches as patches
 from io import BytesIO
 import base64
 
+# =============================================
+# 1. ALLES VOORBEREIDEN ZONDER IETS TE TONEN
+# =============================================
+if not st.session_state.get("initialized", False):
+    with st.spinner("TartanRegistry wordt opgestart… even geduld"):
+        # Kleuren
+        colors = {
+            "R": "#C21807", "G": "#007A3D", "B": "#00205B", "K": "#000000",
+            "W": "#FFFFFF", "Y": "#FFD700", "O": "#FF6600", "P": "#7D287D",
+            "A": "#964B00", "L": "#87CEEB", "N": "#808080"
+        }
+        
+        # Officiële data (met fallback)
+        try:
+            df = pd.read_csv("https://www.tartanregister.gov.uk/csvExport.ashx", encoding="utf-8")
+            df = df[['TartanName','Threadcount','TartanDescription']].dropna(subset=['Threadcount'])
+            df['TartanName'] = df['TartanName'].str.strip().str.title()
+        except:
+            df = None
+
+        # Alles opslaan in session_state
+        st.session_state.colors = colors
+        st.session_state.df_official = df
+        st.session_state.initialized = True
+    
+    st.success("Klaar!")
+    st.rerun()   # nu pas de echte app tonen
+
+# =============================================
+# 2. HIER BEGINT DE ECHTE APP (alles is al geladen)
+# =============================================
+
 st.set_page_config(page_title="TartanRegistry", layout="centered")
 st.title("TartanRegistry")
 
-# === Kleuren ===
-colors = {
-    "R": "#C21807", "G": "#007A3D", "B": "#00205B", "K": "#000000",
-    "W": "#FFFFFF", "Y": "#FFD700", "O": "#FF6600", "P": "#7D287D",
-    "A": "#964B00", "L": "#87CEEB", "N": "#808080"
-}
+colors = st.session_state.colors
+df_official = st.session_state.df_official
 
-# === Officiële data (met veilige fallback) ===
-@st.cache_data(ttl=3600)
-def load_official():
-    try:
-        df = pd.read_csv("https://www.tartanregister.gov.uk/csvExport.ashx", encoding="utf-8")
-        df = df[['TartanName','Threadcount','TartanDescription']].dropna(subset=['Threadcount'])
-        df['TartanName'] = df['TartanName'].str.strip().str.title()
-        return df
-    except:
-        return None
-
-df_official = load_o_()
-
-# === Layout ===
 c1, c2 = st.columns([1,2])
 
 with c1:
@@ -110,4 +124,4 @@ with c2:
     st.download_button("Download PNG", buf, f"{name}.png", "image/png")
     st.code(thread_input)
 
-st.caption("TartanRegistry – werkt weer · 2025")
+st.caption("TartanRegistry – eindelijk zonder vloek · 2025")
