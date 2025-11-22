@@ -1,5 +1,3 @@
-# streamlit/app.py  ← plak dit 1-op-1 in je repo TartanRegistry
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,111 +5,101 @@ import matplotlib.patches as patches
 from io import BytesIO
 import base64
 
-# === Pagina-instellingen ===
 st.set_page_config(page_title="TartanRegistry", layout="centered")
 st.title("TartanRegistry")
 
-# === Data inladen (dezelfde stabiele fallback als vanavond) ===
-@st.cache_data
-def get_tartans():
-    data = {
-        "TartanName": [
-            "Black Watch", "Royal Stewart", "Dress Gordon", "Campbell", "MacKenzie",
-            "Douglas", "Buchanan", "Fraser", "MacLeod Of Lewis", "Graham Of Menteith",
-            "MacDonald", "Stewart Hunting", "MacGregor", "Cameron Of Erracht", "Anderson"
-        ],
-        "Threadcount": [
-            "K8 R4 K24 B24 K24 G32",
-            "R8 B4 R4 W4 R4 Y4 R32",
-            "K8 G28 W4 B28 K4 G28 W4 K28",
-            "B4 G32 K4 B32 G32 K32",
-            "G8 K32 R4 K32 G32",
-            "G8 B32 K4 B32 G32",
-            "Y4 K32 R4 K32 Y32",
-            "R8 G32 K4 G32 R32",
-            "B8 G32 R4 G32 B32",
-            "B8 R32 G4 R32 B32",
-            "R8 G32 W4 G32 R32 K32",
-            "G8 K32 R4 K32 G32 B32",
-            "R8 G32 W4 G32 R32 K32",
-            "R8 B32 K4 B32 R32 G32",
-            "B8 R32 G4 R32 B32 K32"
-        ],
-        "Description": [
-            "Famous regimental tartan of the Black Watch regiment.",
-            "The most recognisable Stewart tartan worldwide.",
-            "Modern dress variant of the Gordon clan tartan.",
-            "Clan Campbell of Argyll official tartan.",
-            "MacKenzie clan tartan, ancient colours.",
-            "Ancient Douglas tartan.",
-            "Buchanan modern tartan.",
-            "Fraser hunting tartan.",
-            "MacLeod of Lewis hunting tartan.",
-            "Graham of Menteith tartan.",
-            "Clan Donald / MacDonald tartan.",
-            "Stewart hunting variant.",
-            "MacGregor tartan.",
-            "Cameron of Erracht tartan.",
-            "Anderson clan tartan."
-        ]
-    }
-    return pd.DataFrame(data)
+# === Kleurenpalet ===
+colors = {
+    "R": "#C21807", "G": "#007A3D", "B": "#00205B", "K": "#000000",
+    "W": "#FFFFFF", "Y": "#FFD700", "O": "#FF6600", "P": "#7D287D",
+    "A": "#964B00", "L": "#87CEEB", "N": "#808080"
+}
 
-df = get_tartans()
+# === Officiële database (fallback blijft) ===
+@st.cache_data(ttl=3600)
+def load_official():
+    try:
+        df = pd.read_csv("https://www.tartanregister.gov.uk/csvExport.ashx")
+        df = df[['TartanName', 'Threadcount', 'TartanDescription']].dropna(subset=['Threadcount'])
+        df['TartanName'] = df['TartanName'].str.strip().str.title()
+        return df
+    except:
+        return None
 
-# === Zoeken ===
-search = st.text_input("Typ de eerste letters…", "", placeholder="black, royal, mac…")
+df_official = load_official()
 
-if search:
-    results = df[df["TartanName"].str.startswith(search.strip().title())]
-    if not results.empty:
-        selected = st.selectbox("Gevonden", results["TartanName"], index=0)
+# === Layout ===
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    st.subheader("Zoek in register")
+    search = st.text_input("Begin met typen…", "", placeholder="black, royal, mac…", key="search")
+
+    if search and df_official is not None:
+        results = df_official[df_official["TartanName"].str.startswith(search.strip().title())]
+        if not results.empty:
+            selected_name = st.selectbox("Gevonden tartans", results["TartanName"], index=0, key="select")
+            threadcount_input = results[results["TartanName"] == selected_name].iloc[0]["Threadcount"]
+            description = results[results["TartanName"] == selected_name].iloc[0]["TartanDescription"]
+        else:
+            selected_name = None
+            threadcount_input = ""
+            description = ""
     else:
-        st.info("Geen tartan gevonden")
-        selected = None
-else:
-    selected = None
+        selected_name = None
+        threadcount_input = ""
+        description = ""
 
-# === Weergave ===
-if selected:
-    row = df[df["TartanName"] == selected].iloc[0]
+    st.subheader("Of maak je eigen tartan")
+    threadcount_input = st.text_input(
+        "Threadcount (bijv. R20 K40 G20 Y4 R20)",
+        value=threadcount_input or "K20 R40 K8 G32 K8 R40 K20",
+        key="custom_thread",
+        help="Gebruik letters R,G,B,K,W,Y,W,O,P,A,L,N + aantal draden"
+    )
 
-    col1, col2 = st.columns([2,1])
-    with col1:
-        st.subheader(selected)
-        st.write(row["Description"])
-    with col2:
-        st.subheader("Threadcount")
-        st.code(row["Threadcount"], language=None)
+    if st.button("Genereer tartan"):
+        pass  # Enter werkt al via on_change, maar knop als extra
 
-    # Visualisatie (streepdiktes kloppen nu exact)
-    colors = {"R":"#C21807","G":"#007A3D","B":"#00205B","K":"#000000","W":"#FFFFFF","Y":"#FFD700"}
+with col2:
+    if threadcount_input.strip():
+        # Parse threadcount
+        parts = threadcount_input.upper().replace(" ", "").split()
+        parts = [p for p in parts if len(p) >= 2 and p[0] in colors]
 
-    fig, ax = plt.subplots(figsize=(14,6))
-    ax.set_xlim(0,400); ax.set_ylim(0,180); ax.axis("off")
+        if not parts:
+            st.error("Geen geldige threadcount gevonden")
+        else:
+            # Visualisatie
+            fig, ax = plt.subplots(figsize=(14, 7))
+            ax.set_xlim(0, 400)
+            ax.set_ylim(0, 200)
+            ax.axis("off")
 
-    x = 0
-    for part in row["Threadcount"].split():
-        if len(part)<2: continue
-        col = colors.get(part[0].upper(), "#555")
-        w = int(part[1:]) * 6
-        ax.add_patch(patches.Rectangle((x,0), w, 180, color=col))
-        ax.add_patch(patches.Rectangle((0,x), 400, w, color=col))
-        x += w
+            x = 0
+            for part in parts:
+                col = colors.get(part[0], "#555555")
+                try:
+                    w = int(part[1:])
+                except:
+                    w = 10
+                w_scaled = w * 5
+                # Horizontaal + verticaal
+                ax.add_patch(patches.Rectangle((x, 0), w_scaled, 200, color=col, linewidth=0))
+                ax.add_patch(patches.Rectangle((0, x), 400, w_scaled, color=col, linewidth=0))
+                x += w_scaled
 
-    # PNG + hover-vergrootglas
-    buf = BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=200)
-    buf.seek(0)
-    b64 = base64.b64encode(buf.read()).decode()
+            plt.tight_layout()
 
-    st.markdown(f"""
-    <style>
-    .zoom {{cursor: zoom-in; transition: 0.3s;}}
-    .zoom:hover {{transform: scale(2.5); z-index: 10;}}
-    </style>
-    <img src="data:image/png;base64,{b64}" class="zoom">
-    """, unsafe_allow_html=True)
+            # PNG + hover zoom
+            buf = BytesIO()
+            fig.savefig(buf, format="png", bbox_inches="tight", dpi=200)
+            buf.seek(0)
+            img_b64 = base64.b64encode(buf.read()).decode()
 
-    buf.seek(0)
-    st.download_button("Download PNG", buf, f"{selected}.png", "image/png")
+            st.markdown(f"""
+            <style>
+            .zoom {{cursor: zoom-in; transition: 0.3s ease;}}
+            .zoom:hover {{transform: scale(2.8); transform-origin: center; z-index: 99;}}
+            </style>
+            <
