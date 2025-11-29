@@ -1,105 +1,82 @@
+# app.py – Huidige, 100% werkende versie (nov 2025)
 import streamlit as st
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import numpy as np
+from io import BytesIO
+import matplotlib.pyplot as plt
 import re
 
-st.set_page_config(page_title="Tartan Designer", layout="wide")
-st.title("🏴󠁧󠁢󠁳󠁣󠁴󠁿 Tartan Designer – Adjacent Zone Blending")
-
-# Kleuren
-color_map = {
-    "K": "#000000", "R": "#C00000", "G": "#006000", "B": "#000080",
-    "Y": "#FFC000", "W": "#FFFFFF", "P": "#800080", "O": "#FF8000",
-    "A": "#808080", "Gold": "#D4AF37"
+COLORS = {
+    "R": (178, 34, 52), "DR": (120, 0, 0), "G": (0, 115, 46), "DG": (0, 70, 35),
+    "B": (0, 41, 108), "DB": (0, 20, 60), "K": (30, 30, 30), "W": (255, 255, 255),
+    "Y": (255, 203, 0), "O": (255, 102, 0), "P": (128, 0, 128), "LG": (200, 230, 200),
+    "LB": (180, 200, 230), "A": (160, 160, 160), "T": (0, 130, 130),
 }
 
-# Sidebar
-st.sidebar.header("Threadcount")
-threadCs = st.sidebar.text_area("Threadcount", "R8 G24 B8 K32 Y4 R8 G24 B8 K32 Y4", height=120)
-
-symmetry = st.sidebar.selectbox("Symmetry", ["None", "Horizontal", "Vertical", "Both", "Rotational 180°"])
-blend_strength = st.sidebar.slider("Blend strength tussen zones", 0.0, 1.0, 0.6, 0.05)
-zones = st.sidebar.slider("Aantal zones", 2, 6, 4)
-
-# Parse threadcount → list van (letter, count)
-def parse_tc(tc):
-    #parts = tc.upper().split()
-    # Vervang komma's door spaties en splits daarna
-    cleaned = re.sub(r'[,\s]+', ' ', tc.strip())   # ← dit is de magie
+def parse_threadcount(tc: str):
+    cleaned = re.sub(r'[,\s]+', ' ', tc.strip())
     parts = cleaned.upper().split()
-    seq = []
+    pattern = []
     for part in parts:
-        if len(part) > 1 and part[0] in color_map and part[1:].isdigit():
-            seq.append((part[0], int(part[1:])))
-    return seq
+        if not part: continue
+        color = None
+        num_str = part
+        for c in sorted(COLORS.keys(), key=len, reverse=True):
+            if part.startswith(c):
+                color = c; num_str = part[len(c):]; break
+            if part.endswith(c):
+                color = c; num_str = part[:-len(c)]; break
+        if color is None:
+            st.error(f"Kleur niet herkend: '{part}'"); return None
+        count = 1.0 if not num_str else (int(num_str.split('/')[1])/2 if '/' in num_str else float(num_str))
+        pattern.append((color, count))
+    return pattern
 
-seq = parse_tc(threadCs)
+def build_sett(pattern):
+    f_counts = [c for _, c in pattern]
+    f_colors = [col for col, _ in pattern]
+    m_counts = f_counts[::-1][1:]
+    m_colors = f_colors[::-1][1:]
+    return f_counts + m_counts, f_colors + m_colors
 
-# Symmetry toepassen (eerst, zodat blend op symmetrische sett gebeurt)
-if symmetry in ["Horizontal", "Rotational 180°"]:
-    seq = seq + seq[::-1]
-elif symmetry == "Vertical":
-    seq = seq + seq
-elif symmetry == "Both":
-    half = seq + seq[::-1]
-    seq = half + half
+def create_tartan(pattern, size=900, thread_width=4, texture=True):
+    sett_counts, sett_colors = build_sett(pattern)
+    widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
+    sett_w = sum(widths)
+    repeats = max(2, (size // sett_w) + 2)
+    tile = np.zeros((sett_w * repeats, sett_w * repeats, 3), dtype=np.uint16)
+    x = 0
+    for _ in range(repeats):
+        for w, col in zip(widths, sett_colors):
+            tile[:, x:x+w] = COLORS[col]
+            x += w
+    weft = tile.copy().transpose(1, 0, 2)
+    tartan = np.minimum(tile + weft, 255).astype(np.uint8)
+    if texture:
+        noise = np.random.randint(-18, 22, tartan.shape, dtype=np.int16)
+        tartan = np.clip(tartan.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+    start = (tartan.shape[0] - size) // 2
+    return tartan[start:start+size, start:start+size]
 
-# Splits in zones
-total_threads = sum(count for _, count in seq)
-zone_size = total_threads // zones
-zones_list = []
-start = 0
-for i in range(zones):
-    end = start + zone_size if i < zones - 1 else total_threads
-    zones_list.append(seq[start:end])
-    start = end
+# ────────────────────────── UI ──────────────────────────
+st.set_page_config(page_title="Echte Tartan Mirror", layout="centered")
+st.title("Echte Tartan Mirror")
 
-# Blend adjacent zones
-blended_seq = zones_list[0].copy()
-for i in range(1, zones):
-    zone_a = zones_list[i-1]
-    zone_b = zones_list[i]
-    blend_steps = max(1, int(len(zone_a) * blend_strength * 0.5))
-    for j in range(blend_steps):
-        if j < len(zone_a) and j < len(zone_b):
-            # Lineair interpoleren tussen kleuren (hex → RGB → lerp → hex)
-            col_a = color_map[zone_a[-1-j][0]]
-            col_b = color_map[zone_b[j][0]]
-            r_a, g_a, b_a = int(col_a[1:3],16), int(col_a[3:5],16), int(col_a[5:7],16)
-            r_b, g_b, b_b = int(col_b[1:3],16), int(col_b[3:5],16), int(col_b[5:7],16)
-            t = j / blend_steps
-            r = int(r_a + (r_b - r_a) * t)
-            g = int(g_a + (g_b - g_a) * t)
-            b = int(b_a + (b_b - b_a) * t)
-            blended_color = f"#{r:02x}{g:02x}{b:02x}"
-            blended_seq.append(("custom", 1, blended_color))
-    blended_seq.extend(zone_b)
+c1, c2 = st.columns([3, 1])
+with c1:
+    tc = st.text_input("Threadcount (spaties of komma's)", value="R18 K12 B6")
+with c2:
+    tw = st.slider("Draad-dikte", 1, 10, 4)
+    tex = st.checkbox("Wol-textuur", True)
 
-# Tekening
-fig, ax = plt.subplots(figsize=(16, 4))
-x = 0
-for item in blended_seq:
-    if len(item) == 2:  # normale thread
-        letter, count = item
-        col = color_map.get(letter, "#808080")
-        for _ in range(count):
-            ax.add_patch(patches.Rectangle((x, 0), 1, 1, color=col))
-            x += 1
-    else:  # blended thread
-        _, count, col = item
-        for _ in range(count):
-            ax.add_patch(patches.Rectangle((x, 0), 1, 1, color=col))
-            x += 1
+if tc.strip():
+    pattern = parse_threadcount(tc)
+    if pattern:
+        img = create_tartan(pattern, size=900, thread_width=tw, texture=tex)
+        st.image(img, use_column_width=True)
 
-ax.set_xlim(0, x)
-ax.set_ylim(0, 1)
-ax.axis("off")
-st.pyplot(fig)
-
-if st.button("Download als PNG"):
-    fig.savefig("blended_tartan.png", dpi=300, bbox_inches="tight", facecolor="#111")
-    with open("blended_tartan.png", "rb") as f:
-        st.download_button("Download PNG", f, "blended_tartan.png", "image/png")
-
-st.caption(f"Zones: {zones} | Blend strength: {blend_strength:.2f} | Symmetry: {symmetry}")
+        buf = BytesIO()
+        plt.imsave(buf, img, format="png")
+        buf.seek(0)
+        st.download_button("Download PNG", buf,
+                          file_name=f"tartan_{tc.strip()[:30].replace(' ', '_').replace(',', '_')}.png",
+                          mime="image/png")
