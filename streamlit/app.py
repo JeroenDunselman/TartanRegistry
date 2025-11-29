@@ -24,7 +24,10 @@ zones = st.sidebar.slider("Aantal zones", 2, 6, 4)
 
 # Parse threadcount → list van (letter, count)
 def parse_tc(tc):
-    parts = tc.upper().split()
+    #parts = tc.upper().split()
+    # Vervang komma's door spaties en splits daarna
+    cleaned = re.sub(r'[,\s]+', ' ', tc.strip())   # ← dit is de magie
+    parts = cleaned.upper().split()
     seq = []
     for part in parts:
         if len(part) > 1 and part[0] in color_map and part[1:].isdigit():
