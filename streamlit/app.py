@@ -1,4 +1,4 @@
-# app.py – Echte Tartan Mirror + Variabele Keperbinding (1/1, 2/1, 2/2, 3/1, Herringbone, etc.)
+# app.py – Tartan Mirror + Jouw Exacte "---+++ → +---++" Keperbinding
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,7 +6,6 @@ import matplotlib.patches as patches
 from io import BytesIO
 import re
 
-# === Kleuren ===
 COLORS = {
     "R": (178, 34, 52), "DR": (120, 0, 0), "G": (0, 115, 46), "DG": (0, 70, 35),
     "B": (0, 41, 108), "DB": (0, 20, 60), "K": (30, 30, 30), "W": (255, 255, 255),
@@ -38,42 +37,42 @@ def build_sett(pattern):
     f_colors  = [col for col, _ in pattern]
     return f_counts + f_counts[::-1][1:], f_colors + f_colors[::-1][1:]
 
-# === VARIABELE KEPERBINDING – DIT IS HET GOUD ===
-def add_twill_pattern(img, twill_type="2/2 (klassieke Schotse tartan)", strength=0.65):
+# === JOUW EXACTE KEPERBINDING: ---+++ → +---++ (naadloos!) ===
+def add_twill_pattern(img, twill_type="2/2 (klassiek)", strength=0.65):
     if strength <= 0 or twill_type == "Platbinding (geen keper)":
         return img.copy()
 
     h, w = img.shape[:2]
     y, x = np.indices((h, w))
 
-    # Exacte geometrie van echte weefbindingen
-    if twill_type == "1/1 (zeer steil)":
-        mask = (x + y) % 2 == 0
-    elif twill_type == "2/1 (scherp, moderne kilts)":
-        mask = (x + y) % 3 < 2
-    elif twill_type == "2/2 (klassieke Schotse tartan)":
-        mask = (x + y) % 4 < 2
-    elif twill_type == "3/1 (brede ribbel)":
-        mask = (x + y) % 4 < 3
-    elif twill_type == "1/3 (zeer steil, zeldzaam)":
-        mask = (x + y) % 4 == 0
-    elif twill_type == "Herringbone (visgraat)":
-        block_size = 32
-        block_x = x // block_size
-        block_y = y // block_size
-        direction = ((block_x + block_y) % 2) * 2 - 1  # +1 of -1
-        local = (x % block_size + y % block_size) * direction
-        mask = (local % 8 < 4)
+    if twill_type == "Jouw Custom (---+++ → +---++)":
+        # Jouw exacte 6×6 patroon – naadloos herhalend
+        custom_pattern = np.array([
+            [0,0,0,1,1,1],  # ---+++
+            [0,0,1,1,1,0],  # --+++-
+            [0,1,1,1,0,0],  # -+++--
+            [1,1,1,0,0,0],  # +++---
+            [1,1,0,0,0,1],  # ++---+
+            [1,0,0,0,1,1]   # +---++
+        ], dtype=bool)
+        mask = np.tile(custom_pattern, (h//6 + 1, w//6 + 1))[:h, :w]
+
     else:
-        mask = (x + y) % 4 < 2  # fallback
+        # Overige bindingen (zoals eerder)
+        if twill_type == "1/1 (zeer steil)":         mask = (x + y) % 2 == 0
+        elif twill_type == "2/1 (scherp)":           mask = (x + y) % 3 < 2
+        elif twill_type == "2/2 (klassiek)":         mask = (x + y) % 4 < 2
+        elif twill_type == "3/1 (breed)":            mask = (x + y) % 4 < 3
+        elif twill_type == "Herringbone":           block = 32; bx = x//block; by = y//block; dir = ((bx+by)%2)*2-1
+                                                     local = (x%block + y%block) * dir; mask = (local % 8 < 4)
+        else:                                        mask = (x + y) % 4 < 2
 
     img_f = img.astype(np.float32)
     shadow    = img_f * (1.0 - strength)
     highlight = np.clip(img_f * (1.0 + strength * 1.8), 0, 255)
-
     result = np.where(mask[..., np.newaxis], highlight, shadow)
 
-    # Extra randdiepte voor fotorealisme
+    # Randversterking voor extra diepte
     diff_y = np.diff(result.astype(np.int16), axis=0, prepend=result[:1])
     diff_x = np.diff(result.astype(np.int16), axis=1, prepend=result[:, :1])
     edges = np.abs(diff_y) + np.abs(diff_x)
@@ -82,8 +81,7 @@ def add_twill_pattern(img, twill_type="2/2 (klassieke Schotse tartan)", strength
 
     return result.astype(np.uint8)
 
-# === Tartan genereren ===
-def create_tartan(pattern, size=900, thread_width=7, texture=True, twill_type="2/2 (klassieke Schotse tartan)", twill_strength=0.65):
+def create_tartan(pattern, size=900, thread_width=7, texture=True, twill_type="2/2 (klassiek)", twill_strength=0.65):
     sett_counts, sett_colors = build_sett(pattern)
     widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
     sett_w = sum(widths)
@@ -108,7 +106,6 @@ def create_tartan(pattern, size=900, thread_width=7, texture=True, twill_type="2
     start = (tartan.shape[0] - size) // 2
     return tartan[start:start+size, start:start+size]
 
-# === Sett-visualisatie ===
 def draw_sett_visualization(pattern, thread_width=8):
     sett_counts, sett_colors = build_sett(pattern)
     widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
@@ -127,7 +124,7 @@ def draw_sett_visualization(pattern, thread_width=8):
 
     pivot_x = total / 2
     ax.axvline(pivot_x, color='#333', linestyle='--', linewidth=2)
-    ax.text(pivot_x, 115, "Potte", ha='center', va='top', fontsize=10, fontweight='bold')
+    ax.text(pivot_x, 115, "PIVOT", ha='center', va='top', fontsize=10, fontweight='bold')
 
     sett_str = " ".join(f"{col}{int(round(c))}" for col, c in zip(sett_colors, sett_counts))
     ax.text(total/2, 125, sett_str, ha='center', va='top', fontsize=12, fontweight='bold')
@@ -139,12 +136,12 @@ def draw_sett_visualization(pattern, thread_width=8):
     return buf, sett_str
 
 # === UI ===
-st.set_page_config(page_title="Tartan Mirror + Variabele Keper", layout="centered")
-st.title("Echte Tartan + Variabele Keperbinding")
+st.set_page_config(page_title="Tartan + Jouw ---+++ → +---++ Keper", layout="centered")
+st.title("Tartan Mirror + Jouw Custom Keperbinding")
 
 col1, col2 = st.columns([3, 1])
 with col1:
-    tc = st.text_input("Threadcount (spaties/komma's)", value="R28 W4 R8 Y4 R28 K32")
+    tc = st.text_input("Threadcount", value="R28 W4 R8 Y4 R28 K32")
 with col2:
     thread_width = st.slider("Draad-dikte", 1, 15, 7)
     texture = st.checkbox("Wol-textuur", True)
@@ -152,14 +149,14 @@ with col2:
     twill_options = [
         "Platbinding (geen keper)",
         "1/1 (zeer steil)",
-        "2/1 (scherp, moderne kilts)",
-        "2/2 (klassieke Schotse tartan)",
-        "3/1 (brede ribbel)",
-        "1/3 (zeer steil, zeldzaam)",
+        "2/1 (scherp)",
+        "2/2 (klassiek)",
+        "3/1 (breed)",
+        "Jouw Custom (---+++ → +---++)",   # JOUW BINDING!
         "Herringbone (visgraat)"
     ]
-    twill_type = st.select_slider("Keperbinding", options=twill_options, value="2/2 (klassieke Schotse tartan)")
-    twill_strength = st.slider("Twill sterkte", 0.0, 0.90, 0.65, 0.01)
+    twill_type = st.select_slider("Keperbinding", options=twill_options, value="Jouw Custom (---+++ → +---++)")
+    twill_strength = st.slider("Twill sterkte", 0.0, 0.90, 0.68, 0.01)
 
 if tc.strip():
     pattern = parse_threadcount(tc)
@@ -171,8 +168,8 @@ if tc.strip():
         buf = BytesIO()
         plt.imsave(buf, img, format="png")
         buf.seek(0)
-        st.download_button("Download stof (900×900)", buf,
-                           file_name=f"tartan_{twill_type.split()[0]}_{tc.strip()[:30].replace(' ', '_')}.png",
+        st.download_button("Download stof", buf,
+                           file_name=f"tartan_your_custom_{tc.strip()[:30].replace(' ', '_')}.png",
                            mime="image/png")
 
         st.markdown("---")
@@ -181,4 +178,4 @@ if tc.strip():
         st.image(sett_buf, use_column_width=True)
         st.code(full_sett, language=None)
 
-st.success("Je hebt zojuist de meest geavanceerde tartan-simulator ter wereld in handen.")
+st.success("Jouw binding ---+++ → +---++ is nu live. Niemand anders ter wereld heeft dit.")
