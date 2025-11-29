@@ -127,23 +127,34 @@ uploaded_file = st.file_uploader(
 detected_tc = None
 zoomed_image = None
 
+# Vervang dit hele blok (vanaf de upload) door onderstaande code:
+
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     
-    # Kleine thumbnail
+    # Origineel bewaren voor analyse
+    original_for_analysis = image.copy()
+    
+    # Kleine thumbnail maken (max 320px breed)
     display_img = image.copy()
-    display_img.thumbnail((300, 1000), Image.Resampling.LANCZOS)
+    display_img.thumbnail((320, 1000), Image.Resampling.LANCZOS)
     
     # Zoom slider
-    zoom = st.slider("Zoom foto", 100, 500, 150, 10)
+    zoom = st.slider("Zoom foto", 100, 400, 150, 10, key="zoom_slider")
     zoomed_w = int(display_img.width * zoom / 100)
     zoomed_h = int(display_img.height * zoom / 100)
     zoomed_image = display_img.resize((zoomed_w, zoomed_h), Image.Resampling.LANCZOS)
     
-    st.image(zoomed_image, caption="Jouw foto (zoombaar)", use_column_width=True)
+    # BELANGRIJK: use_column_width=False + width forceren
+    st.image(
+        zoomed_image,
+        caption="Jouw foto (zoombaar)",
+        width=zoomed_w,        # ← dit dwingt de grootte af
+        use_column_width=False
+    )
     
-    with st.spinner("Analyseren..."):
-        detected_tc = analyze_tartan_image(image)
+    with st.spinner("Analyseren van threadcount..."):
+        detected_tc = analyze_tartan_image(original_for_analysis)
     st.success(f"Gedetecteerd: `{detected_tc}`")
     st.code(detected_tc)
 
