@@ -1,127 +1,68 @@
-# streamlit/app.py  ← plak dit 1-op-1 over je huidige bestand
-
 import streamlit as st
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from io import BytesIO
-import base64
 
-# =============================================
-# 1. ALLES VOORBEREIDEN ZONDER IETS TE TONEN
-# =============================================
-if not st.session_state.get("initialized", False):
-    with st.spinner("TartanRegistry wordt opgestart… even geduld"):
-        # Kleuren
-        colors = {
-            "R": "#C21807", "G": "#007A3D", "B": "#00205B", "K": "#000000",
-            "W": "#FFFFFF", "Y": "#FFD700", "O": "#FF6600", "P": "#7D287D",
-            "A": "#964B00", "L": "#87CEEB", "N": "#808080"
-        }
-        
-        # Officiële data (met fallback)
-        try:
-            df = pd.read_csv("https://www.tartanregister.gov.uk/csvExport.ashx", encoding="utf-8")
-            df = df[['TartanName','Threadcount','TartanDescription']].dropna(subset=['Threadcount'])
-            df['TartanName'] = df['TartanName'].str.strip().str.title()
-        except:
-            df = None
+st.set_page_config(page_title="Tartan Designer", layout="wide")
+st.title("🏴󠁧󠁢󠁳󠁣󠁴󠁿 Design Your Own Tartan")
 
-        # Alles opslaan in session_state
-        st.session_state.colors = colors
-        st.session_state.df_official = df
-        st.session_state.initialized = True
-    
-    st.success("Klaar!")
-    st.rerun()   # nu pas de echte app tonen
+# Kleurenpalet (letter → hex)
+color_map = {
+    "K": "#000000",  # Black
+    "R": "#C00000",  # Red
+    "G": "#006000",  # Green
+    "B": "#000080",  # Blue
+    "Y": "#FFC000",  # Yellow
+    "W": "#FFFFFF",  # White
+    "P": "#800080",  # Purple
+    "O": "#FF8000",  # Orange
+    "A": "#808080",  # Grey
+    "Gold": "#D4AF37"
+}
 
-# =============================================
-# 2. HIER BEGINT DE ECHTE APP (alles is al geladen)
-# =============================================
+st.sidebar.header("Threadcount bouwen")
+threadcount = st.sidebar.text_area("Threadcount", "R8 G24 B8 K32 Y4", height=100)
 
-st.set_page_config(page_title="TartanRegistry", layout="centered")
-st.title("TartanRegistry")
+symmetry = st.sidebar.selectbox("Symmetry", ["None", "Horizontal", "Vertical", "Both", "Rotational 180°"])
+sett_size = st.sidebar.slider("Sett grootte (cm)", 5, 50, 20)
 
-colors = st.session_state.colors
-df_official = st.session_state.df_official
+# Parse threadcount
+def parse_threadcount(tc):
+    parts = tc.upper().split()
+    seq = []
+    for part in parts:
+        if len(part) > 1 and part[0] in color_map and part[1:].isdigit():
+            seq.extend([part[0]] * int(part[1:]))
+    return seq
 
-c1, c2 = st.columns([1,2])
+seq = parse_threadcount(threadcount)
 
-with c1:
-    st.subheader("Zoek register")
-    search = st.text_input("Beginletters", "", placeholder="black, royal…", key="s")
+# Symmetry toepassen
+if symmetry == "Horizontal":
+    seq = seq + seq[::-1]
+elif symmetry == "Vertical":
+    seq = seq + seq
+elif symmetry == "Both":
+    half = seq + seq[::-1]
+    seq = half + half
+elif symmetry == "Rotational 180°":
+    seq = seq + seq[::-1]
 
-    default_tc = "K20 R40 K8 G32 K8 R40 K20"
-    selected_name = None
+# Tekening
+fig, ax = plt.subplots(figsize=(14, 4))
+x = 0
+for letter in seq:
+    col = color_map.get(letter, "#808080")
+    ax.add_patch(patches.Rectangle((x, 0), 1, 1, color=col))
+    x += 1
 
-    if search and df_official is not None:
-        res = df_official[df_official["TartanName"].str.startswith(search.strip().title())]
-        if not res.empty:
-            selected_name = st.selectbox("Gevonden", res["TartanName"], index=0)
-            default_tc = res[res["TartanName"]==selected_name].iloc[0]["Threadcount"]
+ax.set_xlim(0, x)
+ax.set_ylim(0, 1)
+ax.axis('off')
+st.pyplot(fig)
 
-    st.subheader("Eigen tartan")
-    thread_input = st.text_input(
-        "Threadcount (bijv. R30 G20 W4 G20 R30)",
-        value=default_tc,
-        key="tc"
-    )
+if st.button("Download als PNG"):
+    fig.savefig("my_tartan.png", dpi=300, bbox_inches='tight')
+    with open("my_tartan.png", "rb") as f:
+        st.download_button("Download PNG", f, "my_tartan.png", "image/png")
 
-with c2:
-    if not thread_input.strip():
-        st.info("Typ een threadcount")
-        st.stop()
-
-    # Veilige parser
-    raw = thread_input.upper().replace(" ","")
-    parts = []
-    i = 0
-    while i < len(raw):
-        if raw[i] in colors:
-            j = i + 1
-            while j < len(raw) and raw[j].isdigit(): j += 1
-            num = int(raw[i+1:j] or "10")
-            parts.append((raw[i], num))
-            i = j
-        else:
-            i += 1
-
-    if not parts:
-        st.error("Geen geldige threadcount")
-        st.stop()
-
-    # Tekenen
-    fig, ax = plt.subplots(figsize=(14,7))
-    ax.set_xlim(0,400); ax.set_ylim(0,200); ax.axis("off")
-
-    x = 0
-    for code, cnt in parts:
-        col = colors.get(code, "#555")
-        w = cnt * 5
-        ax.add_patch(patches.Rectangle((x,0), w, 200, color=col, linewidth=0))
-        ax.add_patch(patches.Rectangle((0,x), 400, w, color=col, linewidth=0))
-        x += w
-
-    plt.tight_layout()
-
-    buf = BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=200)
-    buf.seek(0)
-    b64 = base64.b64encode(buf.read()).decode()
-
-    st.markdown(f"""
-    <style>
-    .z{{cursor:zoom-in;transition:0.3s;}}
-    .z:hover{{transform:scale(2.8);z-index:99;}}
-    </style>
-    <div style="text-align:center">
-    <img src="data:image/png;base64,{b64}" class="z">
-    </div>
-    """, unsafe_allow_html=True)
-
-    buf.seek(0)
-    name = selected_name if selected_name else "Custom_Tartan"
-    st.download_button("Download PNG", buf, f"{name}.png", "image/png")
-    st.code(thread_input)
-
-st.caption("TartanRegistry – eindelijk zonder vloek · 2025")
+st.caption(f"Sett: {sett_size} cm | Symmetry: {symmetry} | Threads: {len(seq)}")
