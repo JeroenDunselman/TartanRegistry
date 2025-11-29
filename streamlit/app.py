@@ -1,4 +1,4 @@
-# app.py – Tartan Mirror + Jouw Exacte "---+++ → +---++" Keperbinding
+# app.py – Tartan Mirror + Jouw Custom "---+++ → +---++" Keper (foutloos!)
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,6 +6,7 @@ import matplotlib.patches as patches
 from io import BytesIO
 import re
 
+# === Kleuren ===
 COLORS = {
     "R": (178, 34, 52), "DR": (120, 0, 0), "G": (0, 115, 46), "DG": (0, 70, 35),
     "B": (0, 41, 108), "DB": (0, 20, 60), "K": (30, 30, 30), "W": (255, 255, 255),
@@ -37,7 +38,7 @@ def build_sett(pattern):
     f_colors  = [col for col, _ in pattern]
     return f_counts + f_counts[::-1][1:], f_colors + f_colors[::-1][1:]
 
-# === JOUW EXACTE KEPERBINDING: ---+++ → +---++ (naadloos!) ===
+# === ALLE KEPERBINDINGEN + JOUW CUSTOM "---+++ → +---++" ===
 def add_twill_pattern(img, twill_type="2/2 (klassiek)", strength=0.65):
     if strength <= 0 or twill_type == "Platbinding (geen keper)":
         return img.copy()
@@ -45,8 +46,8 @@ def add_twill_pattern(img, twill_type="2/2 (klassiek)", strength=0.65):
     h, w = img.shape[:2]
     y, x = np.indices((h, w))
 
+    # JOUW EXACTE CUSTOM BINDING
     if twill_type == "Jouw Custom (---+++ → +---++)":
-        # Jouw exacte 6×6 patroon – naadloos herhalend
         custom_pattern = np.array([
             [0,0,0,1,1,1],  # ---+++
             [0,0,1,1,1,0],  # --+++-
@@ -57,22 +58,31 @@ def add_twill_pattern(img, twill_type="2/2 (klassiek)", strength=0.65):
         ], dtype=bool)
         mask = np.tile(custom_pattern, (h//6 + 1, w//6 + 1))[:h, :w]
 
+    # Overige bindingen
+    elif twill_type == "1/1 (zeer steil)":
+        mask = (x + y) % 2 == 0
+    elif twill_type == "2/1 (scherp)":
+        mask = (x + y) % 3 < 2
+    elif twill_type == "2/2 (klassiek)":
+        mask = (x + y) % 4 < 2
+    elif twill_type == "3/1 (breed)":
+        mask = (x + y) % 4 < 3
+    elif twill_type == "Herringbone (visgraat)":
+        block = 32
+        bx = x // block
+        by = y // block
+        dir = ((bx + by) % 2) * 2 - 1
+        local = (x % block + y % block) * dir
+        mask = (local % 8 < 4)
     else:
-        # Overige bindingen (zoals eerder)
-        if twill_type == "1/1 (zeer steil)":         mask = (x + y) % 2 == 0
-        elif twill_type == "2/1 (scherp)":           mask = (x + y) % 3 < 2
-        elif twill_type == "2/2 (klassiek)":         mask = (x + y) % 4 < 2
-        elif twill_type == "3/1 (breed)":            mask = (x + y) % 4 < 3
-        elif twill_type == "Herringbone":           block = 32; bx = x//block; by = y//block; dir = ((bx+by)%2)*2-1
-                                                     local = (x%block + y%block) * dir; mask = (local % 8 < 4)
-        else:                                        mask = (x + y) % 4 < 2
+        mask = (x + y) % 4 < 2  # fallback
 
     img_f = img.astype(np.float32)
     shadow    = img_f * (1.0 - strength)
     highlight = np.clip(img_f * (1.0 + strength * 1.8), 0, 255)
     result = np.where(mask[..., np.newaxis], highlight, shadow)
 
-    # Randversterking voor extra diepte
+    # Randversterking
     diff_y = np.diff(result.astype(np.int16), axis=0, prepend=result[:1])
     diff_x = np.diff(result.astype(np.int16), axis=1, prepend=result[:, :1])
     edges = np.abs(diff_y) + np.abs(diff_x)
@@ -106,6 +116,7 @@ def create_tartan(pattern, size=900, thread_width=7, texture=True, twill_type="2
     start = (tartan.shape[0] - size) // 2
     return tartan[start:start+size, start:start+size]
 
+# === Sett-visualisatie ===
 def draw_sett_visualization(pattern, thread_width=8):
     sett_counts, sett_colors = build_sett(pattern)
     widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
@@ -136,7 +147,7 @@ def draw_sett_visualization(pattern, thread_width=8):
     return buf, sett_str
 
 # === UI ===
-st.set_page_config(page_title="Tartan + Jouw ---+++ → +---++ Keper", layout="centered")
+st.set_page_config(page_title="Tartan + Jouw Custom Keper", layout="centered")
 st.title("Tartan Mirror + Jouw Custom Keperbinding")
 
 col1, col2 = st.columns([3, 1])
@@ -152,7 +163,7 @@ with col2:
         "2/1 (scherp)",
         "2/2 (klassiek)",
         "3/1 (breed)",
-        "Jouw Custom (---+++ → +---++)",   # JOUW BINDING!
+        "Jouw Custom (---+++ → +---++)",
         "Herringbone (visgraat)"
     ]
     twill_type = st.select_slider("Keperbinding", options=twill_options, value="Jouw Custom (---+++ → +---++)")
@@ -178,4 +189,4 @@ if tc.strip():
         st.image(sett_buf, use_column_width=True)
         st.code(full_sett, language=None)
 
-st.success("Jouw binding ---+++ → +---++ is nu live. Niemand anders ter wereld heeft dit.")
+st.success("Jouw unieke keperbinding ---+++ → +---++ is nu live en perfect naadloos.")
