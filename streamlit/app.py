@@ -1,4 +1,4 @@
-# app.py – Echte Tartan Mirror + Perfecte Twill (definitief werkend)
+# app.py – Echte Tartan Mirror + Super Realistische Twill (2025)
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,7 +6,7 @@ import matplotlib.patches as patches
 from io import BytesIO
 import re
 
-# === Kleuren ===
+# === Authentieke Schotse kleuren ===
 COLORS = {
     "R": (178, 34, 52), "DR": (120, 0, 0), "G": (0, 115, 46), "DG": (0, 70, 35),
     "B": (0, 41, 108), "DB": (0, 20, 60), "K": (30, 30, 30), "W": (255, 255, 255),
@@ -38,26 +38,35 @@ def build_sett(pattern):
     f_colors  = [col for col, _ in pattern]
     return f_counts + f_counts[::-1][1:], f_colors + f_colors[::-1][1:]
 
-# === TWILL – NU 100% FOUTLOOS ===
-def add_twill_pattern(img, strength=0.18):
+# === SUPER REALISTISCHE TWILL (dit is wat je wilde!) ===
+def add_twill_pattern(img, strength=0.50):
     if strength <= 0:
         return img.copy()
 
     h, w = img.shape[:2]
     y, x = np.indices((h, w))
+    twill_mask = ((x + y) % 4 < 2)  # 2/2 keperbinding
 
-    # 2/2 keper: 2 draden over, 2 draden onder → herhaalt elke 4 pixels
-    twill_mask = ((x + y) % 4 < 2)  # True = draad ligt boven
+    img_f = img.astype(np.float32)
 
-    img_float = img.astype(np.float32)
-    shadow = img_float * (1 - strength)      # donkerder waar draad onder ligt
-    highlight = img_float * (1 + strength * 0.6)  # lichter waar draad boven ligt
+    # Sterke schaduw waar draad onder ligt
+    shadow = img_f * (1.0 - strength)
+    # Krachtige highlight waar draad boven ligt
+    highlight = np.clip(img_f * (1.0 + strength * 1.5), 0, 255)
 
+    # Combineer
     result = np.where(twill_mask[..., np.newaxis], highlight, shadow)
-    return np.clip(result, 0, 255).astype(np.uint8)
+
+    # Subtiele "draad-rand" voor extra diepte (maakt het echt levensecht)
+    edge = np.abs(np.diff(result.astype(np.int16), axis=0, prepend=0))
+    edge += np.abs(np.diff(result.astype(np.int16), axis=1, prepend=0))
+    edge = np.clip(edge.sum(axis=2, keepdims=True), 0, 50)
+    result = np.clip(result + edge * 0.7, 0, 255)
+
+    return result.astype(np.uint8)
 
 # === Tartan genereren ===
-def create_tartan(pattern, size=900, thread_width=4, texture=True, twill=True, twill_strength=0.18):
+def create_tartan(pattern, size=900, thread_width=5, texture=True, twill=True, twill_strength=0.50):
     sett_counts, sett_colors = build_sett(pattern)
     widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
     sett_w = sum(widths)
@@ -76,13 +85,13 @@ def create_tartan(pattern, size=900, thread_width=4, texture=True, twill=True, t
     if twill:
         tartan = add_twill_pattern(tartan, twill_strength)
     if texture:
-        noise = np.random.randint(-18, 22, tartan.shape, dtype=np.int16)
+        noise = np.random.randint(-20, 25, tartan.shape, dtype=np.int16)
         tartan = np.clip(tartan.astype(np.int16) + noise, 0, 255).astype(np.uint8)
 
     start = (tartan.shape[0] - size) // 2
     return tartan[start:start+size, start:start+size]
 
-# === Sett-visualisatie (ongewijzigd) ===
+# === Sett-visualisatie ===
 def draw_sett_visualization(pattern, thread_width=8):
     sett_counts, sett_colors = build_sett(pattern)
     widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
@@ -113,17 +122,17 @@ def draw_sett_visualization(pattern, thread_width=8):
     return buf, sett_str
 
 # === UI ===
-st.set_page_config(page_title="Echte Tartan Mirror + Twill", layout="centered")
-st.title("Echte Tartan Mirror + Zichtbare Keperbinding")
+st.set_page_config(page_title="Echte Tartan + Krachtige Twill", layout="centered")
+st.title("Echte Tartan Mirror + Krachtige Keperbinding")
 
 col1, col2 = st.columns([3, 1])
 with col1:
     tc = st.text_input("Threadcount (spaties of komma's)", value="R18 K12 B6")
 with col2:
-    thread_width = st.slider("Draad-dikte", 1, 10, 4)
+    thread_width = st.slider("Draad-dikte", 1, 12, 6)
     texture = st.checkbox("Wol-textuur", True)
     show_twill = st.checkbox("2/2 Twill (keper) zichtbaar", True)
-    twill_strength = st.slider("Twill sterkte", 0.00, 0.40, 0.18, 0.01) if show_twill else 0.0
+    twill_strength = st.slider("Twill sterkte", 0.0, 0.80, 0.52, 0.01) if show_twill else 0.0
 
 if tc.strip():
     pattern = parse_threadcount(tc)
@@ -136,7 +145,7 @@ if tc.strip():
         plt.imsave(buf, img, format="png")
         buf.seek(0)
         st.download_button("Download stof (900×900)", buf,
-                           file_name=f"tartan_{tc.strip()[:30].replace(' ', '_').replace(',', '_')}.png",
+                           file_name=f"tartan_strong_twill_{tc.strip()[:30].replace(' ', '_').replace(',', '_')}.png",
                            mime="image/png")
 
         st.markdown("---")
@@ -145,4 +154,4 @@ if tc.strip():
         st.image(sett_buf, use_column_width=True)
         st.code(full_sett, language=None)
 
-st.caption("Tip: Royal Stewart → R28 W4 R8 Y4 R28 K32")
+st.success("Probeer: **Royal Stewart** → R28 W4 R8 Y4 R28 K32 (met twill op 0.55 = perfect!)")
