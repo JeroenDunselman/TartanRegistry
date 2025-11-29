@@ -1,4 +1,4 @@
-# app.py – Echte Tartan Mirror + Zichtbare 2/2 Twill (definitief)
+# app.py – Echte Tartan Mirror + Zichtbare 2/2 Twill (nu écht foutloos)
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,18 +38,20 @@ def build_sett(pattern):
     f_colors  = [col for col, _ in pattern]
     return f_counts + f_counts[::-1][1:], f_colors + f_colors[::-1][1:]
 
-# === Twill-effect ===
+# === CORRECTE TWILL ===
 def add_twill_pattern(img, strength=0.18):
-    if strength == 0:
-        return img
+    if strength <= 0:
+        return img.astype(np.uint8)
     h, w = img.shape[:2]
     y, x = np.indices((h, w))
-    pattern = ((x + y) % 4 < 2).astype(float)           # 2/2 twill
-    twill = img.astype(float)
-    twill = twill * (1 - strength * pattern) + twill * (1 + strength * 0.6) * (1 - pattern)
+    pattern = ((x + y) % 4 < 2)  # 2/2 twill patroon
+    pattern = pattern.astype(float)
+
+    img_float = img.astype(float)
+    twill = img_float * (1 - strength * pattern + strength * 0.6 * (1 - pattern))
     return np.clip(twill, 0, 255).astype(np.uint8)
 
-# === Hoofd-tartan functie ===
+# === Tartan genereren ===
 def create_tartan(pattern, size=900, thread_width=4, texture=True, twill=True, twill_strength=0.18):
     sett_counts, sett_colors = build_sett(pattern)
     widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
@@ -75,7 +77,7 @@ def create_tartan(pattern, size=900, thread_width=4, texture=True, twill=True, t
     start = (tartan.shape[0] - size) // 2
     return tartan[start:start+size, start:start+size]
 
-# === Sett-visualisatie ===
+# === Sett-visualisatie (ongewijzigd) ===
 def draw_sett_visualization(pattern, thread_width=8):
     sett_counts, sett_colors = build_sett(pattern)
     widths = [max(1, int(round(c * thread_width))) for c in sett_counts]
@@ -125,7 +127,6 @@ if tc.strip():
                            texture=texture, twill=show_twill, twill_strength=twill_strength)
         st.image(img, use_column_width=True)
 
-        # Download
         buf = BytesIO()
         plt.imsave(buf, img, format="png")
         buf.seek(0)
@@ -139,4 +140,4 @@ if tc.strip():
         st.image(sett_buf, use_column_width=True)
         st.code(full_sett, language=None)
 
-st.caption("Probeer ook: Royal Stewart → R28 W4 R8 Y4 R28 K32")
+st.caption("Tip: Royal Stewart → R28 W4 R8 Y4 R28 K32")
