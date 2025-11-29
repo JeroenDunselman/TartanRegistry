@@ -2,6 +2,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
+import re
 
 st.set_page_config(page_title="Tartan Designer", layout="wide")
 st.title("🏴󠁧󠁢󠁳󠁣󠁴󠁿 Tartan Designer – Adjacent Zone Blending")
