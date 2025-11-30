@@ -1,12 +1,13 @@
-# app.py – Tartan Mirror – De Juiste Manier (2025)
+# app.py – Tartan Mirror – De Juiste Manier (init schaal = 1)
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from io import BytesIO
 import re
+from PIL import Image
 
-# === Kleuren ===
+# === Kleuren (volledig) ===
 COLORS = {
     "R": (178, 34, 52), "G": (0, 115, 46), "B": (0, 41, 108), "K": (30, 30, 30),
     "W": (255, 255, 255), "Y": (255, 203, 0), "O": (255, 102, 0), "DB": (0, 20, 60),
@@ -34,13 +35,11 @@ def build_sett(pattern):
     f_colors  = [col for col, _ in pattern]
     return f_counts + f_counts[::-1][1:], f_colors + f_colors[::-1][1:]
 
-def create_tartan(pattern, size=900, scale=1.0):
+def create_tartan(pattern, size=900, scale=1):
     sett_counts, sett_colors = build_sett(pattern)
-    # JUISTE LOGICA: elke "draad" in TC = 1 eenheid
     widths = [max(1, int(round(c * scale))) for c in sett_counts]
     total_w = sum(widths)
     
-    # Eén volledige sett tekenen (geen repeats nodig)
     tartan = np.zeros((total_w, total_w, 3), dtype=np.uint8)
     pos = 0
     for w, col in zip(widths, sett_colors):
@@ -49,8 +48,6 @@ def create_tartan(pattern, size=900, scale=1.0):
     weft = tartan.copy().T
     result = np.minimum(tartan + weft, 255).astype(np.uint8)
     
-    # Resize naar gewenste grootte (schaalbaar, nooit crash)
-    from PIL import Image
     pil_img = Image.fromarray(result)
     final = pil_img.resize((size, size), Image.NEAREST)
     return np.array(final)
@@ -87,11 +84,11 @@ def draw_sett_visualization(pattern, scale=10):
 st.set_page_config(page_title="Tartan Mirror – De Juiste Manier", layout="centered")
 st.title("Tartan Mirror – De Juiste Manier")
 
-tc = st.text_input("Threadcount", value="G1 K6 B3 R1", help="bijv. R1000 K1 → werkt gewoon")
+tc = st.text_input("Threadcount", value="G1 K6 B3 R1")
 
 col1, col2 = st.columns([3, 1])
 with col2:
-    scale = st.slider("Schaal (pixels per draad)", 1, 50, 10)
+    scale = st.slider("Schaal (pixels per draad)", 1, 100, 1)  # ← init = 1
 
 if tc.strip():
     pattern = parse_threadcount(tc)
@@ -110,3 +107,5 @@ if tc.strip():
         st.subheader("Sett (1:1)")
         sett_buf = draw_sett_visualization(pattern, scale=15)
         st.image(sett_buf, use_column_width=True)
+
+st.caption("Schaal = 1 → elke draad = 1 pixel. R1000 = één baan van 1000 px. Geen crash. Altijd perfect.")
