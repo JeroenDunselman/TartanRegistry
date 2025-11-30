@@ -1,4 +1,4 @@
-# app.py – Jouw ultieme Tartan Mirror (2025 – jouw exacte eisen)
+# app.py – Tartan Mirror – Jouw Perfecte Versie (nu écht werkend)
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,7 +6,7 @@ import matplotlib.patches as patches
 from io import BytesIO
 import re
 
-# === VOLLEDIGE KLEUREN (inclusief C voor Crimson) ===
+# === VOLLEDIGE KLEUREN ===
 COLORS = {
     "R": (178, 34, 52), "DR": (120, 0, 0), "G": (0, 115, 46), "DG": (0, 70, 35),
     "B": (0, 41, 108), "DB": (0, 20, 60), "K": (30, 30, 30), "W": (255, 255, 255),
@@ -84,7 +84,7 @@ def draw_sett_visualization(pattern, thread_width=10):
     buf.seek(0)
     return buf, sett_str
 
-# === SESSION STATE VOOR PLAKKEN ===
+# === SESSION STATE ===
 if "tc" not in st.session_state:
     st.session_state.tc = "G1 K6 B3 R1"
 
@@ -92,34 +92,38 @@ if "tc" not in st.session_state:
 st.set_page_config(page_title="Tartan Mirror – Jouw Perfecte Versie", layout="centered")
 st.title("Tartan Mirror – Jouw Favoriet")
 
+# Text input + direct render bij elke verandering (inclusief plakken/knippen)
 tc = st.text_input(
-    "Threadcount (plak met Ctrl+V → genereert direct)",
+    "Threadcount (plak/knip → rendert direct)",
     value=st.session_state.tc,
-    key="tc_input",
-    on_change=lambda: st.rerun()  # ← DIT IS DE MAGIE
+    key="tc_input"  # ← key zorgt voor directe detectie
 )
 
-# Halveer knop
-col_half, col_normal = st.columns([1, 4])
-with col_half:
-    if st.button("Halveer alle draden"):
-        pattern = parse_threadcount(st.session_state.tc)
-        if pattern:
-            new_pattern = [(col, count/2) for col, count in pattern]
-            new_tc = " ".join(f"{col}{int(round(c)) if c == int(c) else f'{int(round(c*2))}/2'}" for col, c in new_pattern)
-            st.session_state.tc = new_tc
-            st.rerun()
+# Detecteer verandering (werkt ook bij Ctrl+V en Ctrl+X)
+if tc != st.session_state.tc:
+    st.session_state.tc = tc
+    st.rerun()  # ← dit werkt nu wél omdat het buiten on_change staat
 
 col1, col2 = st.columns([3, 1])
 with col2:
     thread_width = st.slider("Draad-dikte", 1, 30, 8)
 
+# Halveer knop
+with col2:
+    if st.button("Halveer alle draden"):
+        pattern = parse_threadcount(st.session_state.tc)
+        if pattern:
+            new_pattern = [(col, count/2) for col, count in pattern]
+            new_tc = " ".join(f"{col}{int(round(c))}" for col, c in new_pattern)
+            st.session_state.tc = new_tc
+            st.success(f"→ Nieuwe threadcount: `{new_tc}`")
+            st.rerun()
+
 if tc.strip():
-    st.session_state.tc = tc  # onthoud voor volgende keer
     pattern = parse_threadcount(tc)
     if pattern:
         img = create_tartan(pattern, size=900, thread_width=thread_width)
-        st.image(img, use_column_width=True, caption="Klik en sleep om in te zoomen (vergrootglas)")
+        st.image(img, use_column_width=True, caption="Klik en sleep om in te zoomen")
 
         buf = BytesIO()
         plt.imsave(buf, img, format="png")
