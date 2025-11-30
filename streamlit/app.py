@@ -1,4 +1,4 @@
-# app.py – Tartan Mirror – 100% Correcte Schotse Spiegeling (2025 – Final & Perfect)
+# app.py – Tartan Mirror – INTELLIGENTE spiegeling (2025 – écht perfect)
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,12 +7,11 @@ from io import BytesIO
 import re
 from PIL import Image
 
-# === Officiële Schotse kleuren ===
+# === Kleuren ===
 COLORS = {
     "R": (178, 34, 52), "G": (0, 115, 46), "B": (0, 41, 108), "K": (30, 30, 30),
     "W": (255, 255, 255), "Y": (255, 203, 0), "O": (255, 102, 0), "DB": (0, 20, 60),
     "DG": (0, 70, 35), "C": (220, 20, 60), "P": (128, 0, 128), "A": (160, 160, 160),
-    "LG": (200, 230, 200), "LB": (180, 200, 230), "T": (0, 130, 130),
 }
 
 def parse_threadcount(tc: str):
@@ -31,12 +30,24 @@ def parse_threadcount(tc: str):
         pattern.append((color, count))
     return pattern
 
-# === CORRECTE SCHOTSE SPIEGELING (pivot-kleur maar één keer!) ===
+# === INTELLIGENTE SPIEGELING ===
 def build_sett(pattern):
     f_counts = [c for _, c in pattern]
     f_colors  = [col for col, _ in pattern]
-    # Spiegel ZONDER de pivot-kleur dubbel te tellen
-    m_counts = f_counts[::-1][1:]   # skip laatste (pivot)
+    
+    # Controleer of het al een volledige symmetrische sett is
+    if len(pattern) > 1:
+        # Vergelijk eerste helft met omgekeerde tweede helft (exclusief pivot)
+        mid = len(pattern) // 2
+        first_half = pattern[:mid]
+        second_half_reversed = pattern[-mid:][::-1] if len(pattern) % 2 else pattern[mid:][::-1]
+        
+        # Als ze ongeveer gelijk zijn → al symmetrisch → niet spiegelen
+        if all(abs(a[1] - b[1]) < 1 and a[0] == b[0] for a, b in zip(first_half, second_half_reversed)):
+            return f_counts, f_colors  # gebruik zoals ingevoerd
+    
+    # Anders: klassieke Schotse spiegeling (pivot maar één keer)
+    m_counts = f_counts[::-1][1:]
     m_colors = f_colors[::-1][1:]
     return f_counts + m_counts, f_colors + m_colors
 
@@ -87,31 +98,25 @@ def draw_sett_visualization(pattern, scale=12):
     return buf
 
 # === UI ===
-st.set_page_config(page_title="Tartan Mirror – Perfecte Schotse Spiegeling", layout="centered")
-st.title("Tartan Mirror – 100% Correcte Schotse Spiegeling")
+st.set_page_config(page_title="Tartan Mirror – Intelligent", layout="centered")
+st.title("Tartan Mirror – Intelligent Spiegeling")
 
 tc = st.text_input("Threadcount", value="B8 K8 A48 K48 B56 K8 R14")
 
 col1, col2 = st.columns([3, 1])
 with col2:
-    scale = st.slider("Schaal (pixels per draad)", 1, 100, 1)
+    scale = st.slider("Schaal", 1, 100, 1)
 
 if tc.strip():
     pattern = parse_threadcount(tc)
     if pattern:
         img = create_tartan(pattern, size=900, scale=scale)
         st.image(img, use_column_width=True)
-
-        buf = BytesIO()
-        plt.imsave(buf, img, format="png")
-        buf.seek(0)
-        st.download_button("Download", buf,
-                           file_name=f"tartan_{tc.strip()[:30].replace(' ', '_')}.png",
-                           mime="image/png")
+        st.download_button("Download", BytesIO(plt.imsave(BytesIO(), img, format="png") or BytesIO().getvalue()),
+                           file_name=f"tartan_{tc.strip()[:30].replace(' ', '_')}.png")
 
         st.markdown("---")
-        st.subheader("Volledige symmetrische sett")
-        sett_buf = draw_sett_visualization(pattern, scale=15)
-        st.image(sett_buf, use_column_width=True)
+        st.subheader("Sett")
+        st.image(draw_sett_visualization(pattern, scale=15), use_column_width=True)
 
-st.success("Pivot-kleur (laatste kleur) wordt nu maar één keer geteld → 100% correct volgens Schotse regels")
+st.success("Nu écht intelligent: herkent of je een half-sett of volledige sett invoert → spiegelt alleen als het nodig is.")
