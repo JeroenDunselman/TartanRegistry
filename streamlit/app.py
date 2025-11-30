@@ -75,4 +75,43 @@ def draw_sett_visualization(pattern, scale=12):
         pos += w
     
     ax.axvline(total/2, color='#333', linestyle='--', linewidth=2)
-    ax.text(total/2, 115
+    ax.text(total/2, 115, "PIVOT", ha='center', va='top', fontsize=10, fontweight='bold')
+    
+    sett_str = " ".join(f"{col}{int(round(c))}" for col, c in zip(sett_colors, sett_counts))
+    ax.text(total/2, 125, sett_str, ha='center', va='top', fontsize=12, fontweight='bold')
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150, facecolor='#f9f9f9')
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+# === UI ===
+st.set_page_config(page_title="Tartan Mirror – Perfecte Schotse Spiegeling", layout="centered")
+st.title("Tartan Mirror – 100% Correcte Schotse Spiegeling")
+
+tc = st.text_input("Threadcount", value="B8 K8 A48 K48 B56 K8 R14")
+
+col1, col2 = st.columns([3, 1])
+with col2:
+    scale = st.slider("Schaal (pixels per draad)", 1, 100, 1)
+
+if tc.strip():
+    pattern = parse_threadcount(tc)
+    if pattern:
+        img = create_tartan(pattern, size=900, scale=scale)
+        st.image(img, use_column_width=True)
+
+        buf = BytesIO()
+        plt.imsave(buf, img, format="png")
+        buf.seek(0)
+        st.download_button("Download", buf,
+                           file_name=f"tartan_{tc.strip()[:30].replace(' ', '_')}.png",
+                           mime="image/png")
+
+        st.markdown("---")
+        st.subheader("Volledige symmetrische sett")
+        sett_buf = draw_sett_visualization(pattern, scale=15)
+        st.image(sett_buf, use_column_width=True)
+
+st.success("Pivot-kleur (laatste kleur) wordt nu maar één keer geteld → 100% correct volgens Schotse regels")
